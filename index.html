@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <link rel="manifest" href="manifest.json">
+  <title>Coffre de Minuit</title>
+  <style>
+    :root { --bg:#0b0b0b; --card:#151515; --text:#f2f2f2; --muted:#b8b8b8; --line:#2a2a2a; }
+    * { box-sizing:border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin:0; background:var(--bg); color:var(--text); }
+    header { padding:14px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(11,11,11,.95); backdrop-filter: blur(8px); }
+    header h1 { margin:0; font-size:18px; font-weight:650; }
+    header .sub { margin-top:4px; color:var(--muted); font-size:12px; display:flex; gap:10px; flex-wrap:wrap; }
+    main { padding:14px 14px 90px; max-width:860px; margin:0 auto; }
+    .tabs { position:fixed; bottom:0; left:0; right:0; border-top:1px solid var(--line); background:rgba(11,11,11,.95); backdrop-filter: blur(8px); display:flex; }
+    .tabbtn { flex:1; padding:12px 8px; background:transparent; border:0; color:var(--muted); font-size:12px; }
+    .tabbtn.active { color:var(--text); font-weight:650; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row > * { flex:1; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input, select, textarea { width:100%; padding:10px 10px; border-radius:10px; border:1px solid var(--line); background:#0f0f0f; color:var(--text); }
+    textarea { min-height:90px; resize:vertical; }
+    button { padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:#101010; color:var(--text); font-weight:650; }
+    button.primary { background:#1d1d1d; }
+    button.danger { background:#2b1111; border-color:#472020; }
+    button:disabled { opacity:.5; }
+    .small { font-size:12px; color:var(--muted); }
+    .pill { display:inline-flex; gap:6px; align-items:center; padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; color:var(--muted); }
+    .list { display:flex; flex-direction:column; gap:8px; }
+    .item { padding:10px; border:1px solid var(--line); border-radius:12px; background:#101010; }
+    .item .top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .item .meta { margin-top:6px; color:var(--muted); font-size:12px; }
+    .right { text-align:right; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .hr { height:1px; background:var(--line); margin:10px 0; }
+    .notice { color:#ffd88a; font-size:12px; }
+    .ok { color:#9ef3b0; font-size:12px; }
+
+    /* Modal */
+    .modalwrap { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:flex-end; }
+    .modal { width:100%; max-width:860px; margin:0 auto; background:var(--card); border:1px solid var(--line); border-radius:16px 16px 0 0; padding:14px; }
+    .modal h3 { margin:0 0 10px 0; font-size:16px; }
+    .modal .actions { display:flex; gap:10px; }
+    .modal .actions button { flex:1; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Coffre de Minuit</h1>
+  <div class="sub">
+    <span class="pill" id="partyNamePill">Partie : (non définie)</span>
+    <span class="pill" id="countsPill">Stock 0 · Attribués 0</span>
+    <span class="pill" id="actionPill">Actions 20%</span>
+  </div>
+</header>
+
+<main>
+  <!-- TAB: PARTIE -->
+  <section class="tab" id="tab-party">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Nom de la partie</label>
+          <input id="partyName" placeholder="Nouvel An 2026" />
+        </div>
+        <div>
+          <label>Probabilité Action</label>
+          <select id="pAction">
+            <option value="0.10">10%</option>
+            <option value="0.15">15%</option>
+            <option value="0.20" selected>20%</option>
+            <option value="0.25">25%</option>
+            <option value="0.30">30%</option>
+            <option value="0.40">40%</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="primary" id="savePartyBtn">Enregistrer</button>
+        <button id="resetBtn" class="danger">Réinitialiser</button>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        Données stockées localement sur ce téléphone (pas de compte).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Actions activées + poids (tirage pondéré)</label>
+          <div class="list" id="actionsConfig"></div>
+        </div>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        Recommandé : Échange direct (3), Échange aléatoire (2), Bouclier (2), Double tirage (1).
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: PARTICIPANTS -->
+  <section class="tab" id="tab-players" style="display:none;">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Ajouter un participant</label>
+          <input id="playerName" placeholder="Prénom" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="primary" id="addPlayerBtn">Ajouter</button>
+        </div>
+      </div>
+      <div class="small">Astuce : gardez des prénoms uniques.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div><strong>Participants</strong></div>
+        <div class="right small" id="playersCount">0</div>
+      </div>
+      <div class="hr"></div>
+      <div class="list" id="playersList"></div>
+    </div>
+  </section>
+
+  <!-- TAB: CADEAUX -->
+  <section class="tab" id="tab-gifts" style="display:none;">
+    <div class="card">
+      <label>Ajouter des IDs cadeaux (un par ligne)</label>
+      <textarea id="giftIds" placeholder="GFT-001&#10;GFT-002&#10;GFT-003"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="primary" id="addGiftsBtn">Ajouter au stock</button>
+        <button id="addSampleGiftsBtn">Exemple (10 IDs)</button>
+      </div>
+      <div class="small">Les IDs doivent être uniques. L’app refusera les doublons.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div><strong>Stock</strong> <span class="small">(disponibles)</span></div>
+        <div class="right small" id="stockCount">0</div>
+      </div>
+      <div class="hr"></div>
+      <div class="list" id="stockList"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div><strong>Attribués</strong></div>
+        <div class="right small" id="assignedCount">0</div>
+      </div>
+      <div class="hr"></div>
+      <div class="list" id="assignedList"></div>
+    </div>
+  </section>
+
+  <!-- TAB: JEU -->
+  <section class="tab" id="tab-game" style="display:none;">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Joueur actif</label>
+          <select id="activePlayer"></select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="primary" id="drawBtn">Lancer</button>
+        </div>
+      </div>
+      <div class="small notice" id="gameNotice" style="margin-top:10px; display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div><strong>Résultat</strong></div>
+      <div class="hr"></div>
+      <div id="resultBox" class="small">Aucun tirage pour l’instant.</div>
+    </div>
+  </section>
+
+  <!-- TAB: HISTORIQUE -->
+  <section class="tab" id="tab-history" style="display:none;">
+    <div class="card">
+      <div class="row">
+        <div><strong>Historique</strong></div>
+        <div class="right">
+          <button id="shareBtn">Partager</button>
+        </div>
+      </div>
+      <div class="small">Journal horodaté des tirages, attributions, échanges, boucliers.</div>
+    </div>
+    <div class="card">
+      <div class="list" id="historyList"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button class="tabbtn active" data-tab="party">Partie</button>
+  <button class="tabbtn" data-tab="players">Participants</button>
+  <button class="tabbtn" data-tab="gifts">Cadeaux</button>
+  <button class="tabbtn" data-tab="game">Jeu</button>
+  <button class="tabbtn" data-tab="history">Historique</button>
+</nav>
+
+<!-- Modal (sélections) -->
+<div class="modalwrap" id="modalWrap" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 id="modalTitle">Titre</h3>
+    <div id="modalBody"></div>
+    <div class="actions" style="margin-top:12px;">
+      <button id="modalCancel">Annuler</button>
+      <button class="primary" id="modalOk">Valider</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   Stockage & Modèle
+========================= */
+const STORAGE_KEY = "coffre_minuit_v1";
+
+const ACTIONS = [
+  { type:"SWAP_DIRECT", label:"Échange direct", defaultWeight:3 },
+  { type:"SWAP_RANDOM", label:"Échange aléatoire", defaultWeight:2 },
+  { type:"SHIELD", label:"Bouclier (1 cadeau)", defaultWeight:2 },
+  { type:"REROLL", label:"Double tirage", defaultWeight:1 },
+];
+
+function nowTs(){ return Date.now(); }
+function fmtTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleString(undefined, {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+}
+
+// PRNG déterministe (Mulberry32) pour audit simple
+function mulberry32(seed){
+  return function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+}
+
+function hashStrToSeed(s){
+  let h = 2166136261;
+  for (let i=0;i<s.length;i++){
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function defaultState(){
+  const partyName = "Nouvel An";
+  const seed = hashStrToSeed(partyName + "_" + String(nowTs()));
+  return {
+    party: { name: partyName, pAction: 0.20, seed },
+    players: [], // {id, name, order}
+    gifts: [],   // {id, status:"IN_STOCK"|"ASSIGNED", ownerId:null|playerId, assignedAt:null|ts, locked:false}
+    actionConfig: ACTIONS.reduce((acc,a)=>{ acc[a.type] = { enabled:true, weight:a.defaultWeight }; return acc; }, {}),
+    logs: []     // {ts, type, actorId, payload}
+  };
+}
+
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    // migration simple: compléter champs manquants
+    if(!parsed.actionConfig){
+      parsed.actionConfig = ACTIONS.reduce((acc,a)=>{ acc[a.type] = { enabled:true, weight:a.defaultWeight }; return acc; }, {});
+    }
+    if(!parsed.party?.seed){
+      const seed = hashStrToSeed((parsed.party?.name||"Party") + "_" + String(nowTs()));
+      parsed.party = { ...(parsed.party||{}), seed };
+    }
+    if(!parsed.logs) parsed.logs = [];
+    if(!parsed.gifts) parsed.gifts = [];
+    if(!parsed.players) parsed.players = [];
+    return parsed;
+  }catch{
+    return defaultState();
+  }
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  renderAll();
+}
+
+function logEvent(type, actorId, payload){
+  state.logs.unshift({ ts: nowTs(), type, actorId: actorId ?? null, payload: payload ?? {} });
+}
+
+/* =========================
+   Helpers domaine
+========================= */
+function getPlayer(id){ return state.players.find(p=>p.id===id) || null; }
+function playerName(id){ return getPlayer(id)?.name || "(inconnu)"; }
+
+function giftsInStock(){ return state.gifts.filter(g=>g.status==="IN_STOCK"); }
+function giftsAssigned(){ return state.gifts.filter(g=>g.status==="ASSIGNED"); }
+function giftsOfPlayer(pid){ return state.gifts.filter(g=>g.ownerId===pid); }
+function nonLockedGiftsOfPlayer(pid){ return state.gifts.filter(g=>g.ownerId===pid && !g.locked); }
+
+function pickRandom(arr, rng){
+  if(arr.length===0) return null;
+  const i = Math.floor(rng()*arr.length);
+  return arr[i];
+}
+
+function mostRecentNonLockedGift(pid){
+  const list = nonLockedGiftsOfPlayer(pid).slice().sort((a,b)=>(b.assignedAt||0)-(a.assignedAt||0));
+  return list[0] || null;
+}
+
+function computeEligibleActions(actorId){
+  const eligible = [];
+  const assignedCount = giftsAssigned().length;
+
+  const actorNonLocked = nonLockedGiftsOfPlayer(actorId);
+  const targets = state.players
+    .filter(p=>p.id!==actorId)
+    .filter(p=>nonLockedGiftsOfPlayer(p.id).length>=1);
+
+  const cfg = state.actionConfig;
+
+  function addIf(type, cond){
+    if(cfg[type]?.enabled && cond){
+      eligible.push({type, weight: Math.max(0, Number(cfg[type].weight||0))});
+    }
+  }
+
+  // SWAP_* : besoin de 2 cadeaux attribués et d'un acteur + cible avec cadeau non protégé
+  addIf("SWAP_DIRECT", assignedCount>=2 && actorNonLocked.length>=1 && targets.length>=1);
+  addIf("SWAP_RANDOM", assignedCount>=2 && actorNonLocked.length>=1 && targets.length>=1);
+
+  // SHIELD : le joueur doit posséder au moins 1 cadeau non encore protégé
+  const actorHasUnprotected = giftsOfPlayer(actorId).some(g=>!g.locked);
+  addIf("SHIELD", actorHasUnprotected);
+
+  // REROLL : s'il y a stock ou une autre action éligible
+  // On l'ajoute provisoirement, puis on re-filtre après
+  const hasStock = giftsInStock().length>=1;
+  addIf("REROLL", hasStock || true);
+
+  // Re-filtre REROLL si vraiment rien d'autre et pas de stock
+  const anyOther = eligible.some(e=>e.type!=="REROLL");
+  const finalEligible = eligible.filter(e=>{
+    if(e.type!=="REROLL") return e.weight>0;
+    if(hasStock) return e.weight>0;
+    return anyOther && e.weight>0;
+  });
+
+  return finalEligible;
+}
+
+function weightedPick(items, rng){
+  const valid = items.filter(x=>x.weight>0);
+  const total = valid.reduce((s,x)=>s+x.weight,0);
+  if(total<=0) return null;
+  let r = rng()*total;
+  for(const it of valid){
+    r -= it.weight;
+    if(r<=0) return it;
+  }
+  return valid[valid.length-1] || null;
+}
+
+/* =========================
+   Modal utilitaire
+========================= */
+const modalWrap = document.getElementById("modalWrap");
+const modalTitle = document.getElementById("modalTitle");
+const modalBody  = document.getElementById("modalBody");
+const modalCancel= document.getElementById("modalCancel");
+const modalOk    = document.getElementById("modalOk");
+
+function openModal({title, bodyNode, onOk}){
+  modalTitle.textContent = title;
+  modalBody.innerHTML = "";
+  modalBody.appendChild(bodyNode);
+  modalWrap.style.display = "flex";
+
+  return new Promise((resolve)=>{
+    const close = (val)=>{
+      modalWrap.style.display = "none";
+      modalCancel.onclick = null;
+      modalOk.onclick = null;
+      resolve(val);
+    };
+    modalCancel.onclick = ()=>close({ok:false});
+    modalOk.onclick = async ()=>{
+      const res = await onOk();
+      if(res?.ok) close(res);
+    };
+  });
+}
+
+/* =========================
+   Actions / Jeu
+========================= */
+function getRng(){
+  // seed de partie + "avancement" basé sur nombre de logs (simple)
+  const adv = state.logs.length + state.gifts.length*3 + state.players.length*7;
+  const seed = (state.party.seed + adv) >>> 0;
+  return mulberry32(seed);
+}
+
+async function doDraw(){
+  const actorId = Number(document.getElementById("activePlayer").value);
+  if(!actorId){
+    setNotice("Ajoutez au moins un participant.");
+    return;
+  }
+  if(state.players.length<1){
+    setNotice("Ajoutez des participants.");
+    return;
+  }
+
+  const stock = giftsInStock();
+  const eligibleActions = computeEligibleActions(actorId);
+
+  if(stock.length===0 && eligibleActions.length===0){
+    setNotice("Impossible : aucun cadeau en stock et aucune action éligible.");
+    return;
+  }
+
+  const rng = getRng();
+  const pAction = Number(state.party.pAction || 0.2);
+
+  const roll = rng();
+  const tryAction = (roll < pAction) && eligibleActions.length>0;
+
+  if(tryAction){
+    const picked = weightedPick(eligibleActions, rng);
+    logEvent("DRAW_RESULT", actorId, { resultType:"ACTION", actionType:picked.type });
+    await resolveAction(picked.type, actorId);
+  }else{
+    logEvent("DRAW_RESULT", actorId, { resultType:"GIFT" });
+    await assignRandomGift(actorId);
+  }
+  saveState();
+}
+
+async function assignRandomGift(actorId){
+  const stock = giftsInStock();
+  if(stock.length===0){
+    logEvent("ERROR_FALLBACK", actorId, { from:"GIFT", reason:"NO_STOCK" });
+    setResult(`Aucun cadeau en stock.`);
+    return;
+  }
+  const rng = getRng();
+  const gift = pickRandom(stock, rng);
+  gift.status = "ASSIGNED";
+  gift.ownerId = actorId;
+  gift.assignedAt = nowTs();
+  // locked reste false
+  logEvent("ASSIGN_GIFT", actorId, { participantId: actorId, giftId: gift.id });
+  setResult(`CADEAU attribué à ${playerName(actorId)} : <span class="mono">${gift.id}</span>`);
+}
+
+async function resolveAction(type, actorId){
+  if(type==="REROLL"){
+    logEvent("REROLL", actorId, { participantId: actorId });
+    setResult(`ACTION : Double tirage pour ${playerName(actorId)}. Relance en cours…`);
+    // relance immédiatement une seule fois
+    await new Promise(r=>setTimeout(r, 350));
+    // Sur la relance, on réutilise doDraw mais sans boucle infinie: on force un tirage normal.
+    // Ici on appelle assign/action avec la même logique, mais ça peut retrigger REROLL.
+    // Pour éviter chaîne interminable : sur relance, on interdit REROLL.
+    await doDrawNoReroll(actorId);
+    return;
+  }
+
+  if(type==="SHIELD"){
+    await applyShield(actorId);
+    return;
+  }
+
+  if(type==="SWAP_RANDOM"){
+    await swapRandom(actorId);
+    return;
+  }
+
+  if(type==="SWAP_DIRECT"){
+    await swapDirect(actorId);
+    return;
+  }
+}
+
+async function doDrawNoReroll(actorId){
+  const stock = giftsInStock();
+  let eligibleActions = computeEligibleActions(actorId).filter(a=>a.type!=="REROLL");
+
+  if(stock.length===0 && eligibleActions.length===0){
+    logEvent("ERROR_FALLBACK", actorId, { from:"REROLL", reason:"NOTHING_AVAILABLE" });
+    setResult(`Relance impossible : aucun cadeau et aucune action éligible.`);
+    return;
+  }
+
+  const rng = getRng();
+  const pAction = Number(state.party.pAction || 0.2);
+  const roll = rng();
+  const tryAction = (roll < pAction) && eligibleActions.length>0;
+
+  if(tryAction){
+    const picked = weightedPick(eligibleActions, rng);
+    logEvent("DRAW_RESULT", actorId, { resultType:"ACTION", actionType:picked.type, reroll:true });
+    await resolveAction(picked.type, actorId);
+  }else{
+    logEvent("DRAW_RESULT", actorId, { resultType:"GIFT", reroll:true });
+    await assignRandomGift(actorId);
+  }
+}
+
+async function applyShield(actorId){
+  const owned = giftsOfPlayer(actorId).filter(g=>!g.locked);
+  if(owned.length===0){
+    // fallback cadeau
+    logEvent("ERROR_FALLBACK", actorId, { from:"ACTION", attemptedActionType:"SHIELD", reason:"NO_UNPROTECTED_GIFTS", fallbackTo:"GIFT" });
+    await assignRandomGift(actorId);
+    return;
+  }
+
+  let targetGift = null;
+
+  if(owned.length===1){
+    targetGift = owned[0];
+  }else{
+    // modal selection
+    const body = document.createElement("div");
+    body.innerHTML = `<label>Choisir un cadeau à protéger</label>`;
+    const sel = document.createElement("select");
+    for(const g of owned){
+      const opt = document.createElement("option");
+      opt.value = g.id;
+      opt.textContent = g.id;
+      sel.appendChild(opt);
+    }
+    body.appendChild(sel);
+
+    const res = await openModal({
+      title: "Bouclier",
+      bodyNode: body,
+      onOk: async ()=>({ok:true, giftId: sel.value})
+    });
+    if(!res.ok) { setResult("Action annulée."); return; }
+    targetGift = owned.find(g=>g.id===res.giftId) || owned[0];
+  }
+
+  targetGift.locked = true;
+  logEvent("SHIELD", actorId, { participantId: actorId, giftId: targetGift.id });
+  setResult(`ACTION : Bouclier appliqué. ${playerName(actorId)} protège <span class="mono">🔒 ${targetGift.id}</span>`);
+}
+
+async function swapRandom(actorId){
+  const actorGift = mostRecentNonLockedGift(actorId);
+  const targets = state.players
+    .filter(p=>p.id!==actorId)
+    .filter(p=>nonLockedGiftsOfPlayer(p.id).length>=1);
+
+  if(!actorGift || targets.length===0){
+    logEvent("ERROR_FALLBACK", actorId, { from:"ACTION", attemptedActionType:"SWAP_RANDOM", reason:"NO_ELIGIBLE_TARGET_OR_GIFT", fallbackTo:"GIFT" });
+    await assignRandomGift(actorId);
+    return;
+  }
+
+  const rng = getRng();
+  const target = pickRandom(targets, rng);
+  const targetGift = mostRecentNonLockedGift(target.id);
+
+  if(!targetGift){
+    logEvent("ERROR_FALLBACK", actorId, { from:"ACTION", attemptedActionType:"SWAP_RANDOM", reason:"TARGET_HAS_NO_NON_LOCKED_GIFT", fallbackTo:"GIFT" });
+    await assignRandomGift(actorId);
+    return;
+  }
+
+  // swap owners
+  actorGift.ownerId = target.id;
+  targetGift.ownerId = actorId;
+
+  logEvent("SWAP", actorId, { actorParticipantId: actorId, targetParticipantId: target.id, actorGiftId: actorGift.id, targetGiftId: targetGift.id });
+  setResult(`ACTION : Échange aléatoire. ${playerName(actorId)} échange <span class="mono">${actorGift.id}</span> avec ${playerName(target.id)} (<span class="mono">${targetGift.id}</span>).`);
+}
+
+async function swapDirect(actorId){
+  const actorNonLocked = nonLockedGiftsOfPlayer(actorId);
+  const targets = state.players
+    .filter(p=>p.id!==actorId)
+    .filter(p=>nonLockedGiftsOfPlayer(p.id).length>=1);
+
+  if(actorNonLocked.length===0 || targets.length===0){
+    logEvent("ERROR_FALLBACK", actorId, { from:"ACTION", attemptedActionType:"SWAP_DIRECT", reason:"NO_ELIGIBLE_TARGET_OR_GIFT", fallbackTo:"GIFT" });
+    await assignRandomGift(actorId);
+    return;
+  }
+
+  // Modal: choisir cible + cadeaux (si multiples)
+  const body = document.createElement("div");
+
+  const targetSel = document.createElement("select");
+  for(const t of targets){
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.name;
+    targetSel.appendChild(opt);
+  }
+
+  const actorGiftSel = document.createElement("select");
+  actorNonLocked
+    .slice()
+    .sort((a,b)=>(b.assignedAt||0)-(a.assignedAt||0))
+    .forEach(g=>{
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.id;
+      actorGiftSel.appendChild(opt);
+    });
+
+  const targetGiftSel = document.createElement("select");
+
+  function refreshTargetGifts(){
+    targetGiftSel.innerHTML = "";
+    const tid = Number(targetSel.value);
+    const gifts = nonLockedGiftsOfPlayer(tid)
+      .slice()
+      .sort((a,b)=>(b.assignedAt||0)-(a.assignedAt||0));
+    for(const g of gifts){
+      const opt = document.createElement("option");
+      opt.value = g.id; opt.textContent = g.id;
+      targetGiftSel.appendChild(opt);
+    }
+  }
+  targetSel.addEventListener("change", refreshTargetGifts);
+  refreshTargetGifts();
+
+  body.innerHTML = `
+    <div class="small">Les cadeaux protégés (🔒) sont exclus automatiquement.</div>
+    <div style="height:10px;"></div>
+  `;
+
+  const wrap1 = document.createElement("div");
+  wrap1.innerHTML = `<label>Cible</label>`;
+  wrap1.appendChild(targetSel);
+
+  const wrap2 = document.createElement("div");
+  wrap2.innerHTML = `<label>Cadeau de ${playerName(actorId)}</label>`;
+  wrap2.appendChild(actorGiftSel);
+
+  const wrap3 = document.createElement("div");
+  wrap3.innerHTML = `<label>Cadeau de la cible</label>`;
+  wrap3.appendChild(targetGiftSel);
+
+  body.appendChild(wrap1);
+  body.appendChild(document.createElement("div")).style.height="10px";
+  body.appendChild(wrap2);
+  body.appendChild(document.createElement("div")).style.height="10px";
+  body.appendChild(wrap3);
+
+  const res = await openModal({
+    title: "Échange direct",
+    bodyNode: body,
+    onOk: async ()=>{
+      const tid = Number(targetSel.value);
+      const aGiftId = actorGiftSel.value;
+      const tGiftId = targetGiftSel.value;
+      if(!tid || !aGiftId || !tGiftId) return {ok:false};
+      return {ok:true, tid, aGiftId, tGiftId};
+    }
+  });
+
+  if(!res.ok){ setResult("Action annulée."); return; }
+
+  const aGift = state.gifts.find(g=>g.id===res.aGiftId);
+  const tGift = state.gifts.find(g=>g.id===res.tGiftId);
+
+  // Safety: bloquer si locked (ne devrait pas arriver)
+  if(!aGift || !tGift || aGift.locked || tGift.locked){
+    logEvent("ERROR_FALLBACK", actorId, { from:"ACTION", attemptedActionType:"SWAP_DIRECT", reason:"LOCKED_OR_MISSING_GIFT", fallbackTo:"GIFT" });
+    await assignRandomGift(actorId);
+    return;
+  }
+
+  aGift.ownerId = res.tid;
+  tGift.ownerId = actorId;
+
+  logEvent("SWAP", actorId, { actorParticipantId: actorId, targetParticipantId: res.tid, actorGiftId: aGift.id, targetGiftId: tGift.id });
+  setResult(`ACTION : Échange direct confirmé. ${playerName(actorId)} ⇄ ${playerName(res.tid)} (${aGift.id} ↔ ${tGift.id}).`);
+}
+
+/* =========================
+   UI / Rendu
+========================= */
+function setNotice(msg){
+  const el = document.getElementById("gameNotice");
+  el.style.display = msg ? "block" : "none";
+  el.textContent = msg || "";
+}
+function setResult(html){
+  document.getElementById("resultBox").innerHTML = html;
+  setNotice("");
+}
+
+function renderHeader(){
+  document.getElementById("partyNamePill").textContent = `Partie : ${state.party.name || "(non définie)"}`;
+  const st = giftsInStock().length;
+  const as = giftsAssigned().length;
+  document.getElementById("countsPill").textContent = `Stock ${st} · Attribués ${as}`;
+  document.getElementById("actionPill").textContent = `Actions ${Math.round(Number(state.party.pAction||0.2)*100)}%`;
+}
+
+function renderActionsConfig(){
+  const root = document.getElementById("actionsConfig");
+  root.innerHTML = "";
+  for(const a of ACTIONS){
+    const cfg = state.actionConfig[a.type] || { enabled:true, weight:a.defaultWeight };
+    const row = document.createElement("div");
+    row.className = "item";
+    row.innerHTML = `
+      <div class="top">
+        <div><strong>${a.label}</strong></div>
+        <div class="right">
+          <label class="small">Actif</label>
+          <input type="checkbox" ${cfg.enabled ? "checked":""} data-type="${a.type}" class="actEnable" style="width:auto; transform:scale(1.2);">
+        </div>
+      </div>
+      <div class="meta row" style="margin-top:8px;">
+        <div>
+          <label>Poids</label>
+          <input type="number" min="0" max="9" value="${cfg.weight}" data-type="${a.type}" class="actWeight">
+        </div>
+        <div class="small">
+          Plus le poids est élevé, plus l’action sort souvent (si éligible).
+        </div>
+      </div>
+    `;
+    root.appendChild(row);
+  }
+
+  root.querySelectorAll(".actEnable").forEach(chk=>{
+    chk.addEventListener("change", (e)=>{
+      const t = e.target.getAttribute("data-type");
+      state.actionConfig[t] = state.actionConfig[t] || { enabled:true, weight:1 };
+      state.actionConfig[t].enabled = e.target.checked;
+      saveState();
+    });
+  });
+  root.querySelectorAll(".actWeight").forEach(inp=>{
+    inp.addEventListener("change", (e)=>{
+      const t = e.target.getAttribute("data-type");
+      state.actionConfig[t] = state.actionConfig[t] || { enabled:true, weight:1 };
+      state.actionConfig[t].weight = Number(e.target.value||0);
+      saveState();
+    });
+  });
+}
+
+function renderPlayers(){
+  document.getElementById("playersCount").textContent = String(state.players.length);
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+
+  const sorted = state.players.slice().sort((a,b)=>a.order-b.order);
+  for(const p of sorted){
+    const owned = giftsOfPlayer(p.id);
+    const lockedCount = owned.filter(g=>g.locked).length;
+    const div = document.createElement("div");
+    div.className="item";
+    div.innerHTML = `
+      <div class="top">
+        <div><strong>${p.name}</strong></div>
+        <div class="right small">${owned.length} cadeau(x) · 🔒 ${lockedCount}</div>
+      </div>
+      <div class="meta">
+        ${owned.slice().sort((a,b)=>(b.assignedAt||0)-(a.assignedAt||0)).slice(0,6).map(g=>{
+          return `<span class="mono">${g.locked ? "🔒 ":""}${g.id}</span>`;
+        }).join(" · ") || "<span class='small'>Aucun cadeau attribué</span>"}
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button data-id="${p.id}" class="delPlayer danger">Supprimer</button>
+      </div>
+    `;
+    list.appendChild(div);
+  }
+
+  list.querySelectorAll(".delPlayer").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      const id = Number(e.target.getAttribute("data-id"));
+      const owned = giftsOfPlayer(id);
+      if(owned.length>0){
+        alert("Impossible : ce participant possède déjà des cadeaux. Réinitialisez la partie si nécessaire.");
+        return;
+      }
+      state.players = state.players.filter(p=>p.id!==id);
+      saveState();
+    });
+  });
+
+  // select joueur actif
+  const sel = document.getElementById("activePlayer");
+  const current = Number(sel.value || 0);
+  sel.innerHTML = "";
+  for(const p of sorted){
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+  if(sorted.length>0){
+    const stillExists = sorted.some(p=>p.id===current);
+    sel.value = String(stillExists ? current : sorted[0].id);
+  }
+}
+
+function renderGifts(){
+  const stock = giftsInStock().slice().sort((a,b)=>a.id.localeCompare(b.id));
+  const assigned = giftsAssigned().slice().sort((a,b)=>(b.assignedAt||0)-(a.assignedAt||0));
+
+  document.getElementById("stockCount").textContent = String(stock.length);
+  document.getElementById("assignedCount").textContent = String(assigned.length);
+
+  const stockList = document.getElementById("stockList");
+  stockList.innerHTML = "";
+  stock.slice(0,120).forEach(g=>{
+    const div = document.createElement("div");
+    div.className="item";
+    div.innerHTML = `
+      <div class="top">
+        <div class="mono">${g.id}</div>
+        <div class="right small">Stock</div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button class="danger delGift" data-id="${g.id}">Retirer</button>
+      </div>
+    `;
+    stockList.appendChild(div);
+  });
+  if(stock.length>120){
+    const d=document.createElement("div");
+    d.className="small";
+    d.textContent = `Affichage limité à 120. Total stock: ${stock.length}`;
+    stockList.appendChild(d);
+  }
+
+  stockList.querySelectorAll(".delGift").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      const id = e.target.getAttribute("data-id");
+      state.gifts = state.gifts.filter(g=>g.id!==id);
+      saveState();
+    });
+  });
+
+  const assignedList = document.getElementById("assignedList");
+  assignedList.innerHTML = "";
+  assigned.slice(0,200).forEach(g=>{
+    const div = document.createElement("div");
+    div.className="item";
+    div.innerHTML = `
+      <div class="top">
+        <div class="mono">${g.locked ? "🔒 " : ""}${g.id}</div>
+        <div class="right small">${playerName(g.ownerId)}</div>
+      </div>
+      <div class="meta">Attribué à ${fmtTime(g.assignedAt || nowTs())}</div>
+    `;
+    assignedList.appendChild(div);
+  });
+  if(assigned.length>200){
+    const d=document.createElement("div");
+    d.className="small";
+    d.textContent = `Affichage limité à 200. Total attribués: ${assigned.length}`;
+    assignedList.appendChild(d);
+  }
+}
+
+function renderHistory(){
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+  if(state.logs.length===0){
+    list.innerHTML = `<div class="small">Aucun événement pour l’instant.</div>`;
+    return;
+  }
+  state.logs.slice(0,250).forEach(ev=>{
+    const actor = ev.actorId ? playerName(ev.actorId) : "";
+    const div = document.createElement("div");
+    div.className="item";
+    div.innerHTML = `
+      <div class="top">
+        <div><strong>${ev.type}</strong> <span class="small">· ${fmtTime(ev.ts)}</span></div>
+        <div class="right small">${actor}</div>
+      </div>
+      <div class="meta mono">${escapeHtml(JSON.stringify(ev.payload))}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+}
+
+function renderAll(){
+  renderHeader();
+  renderActionsConfig();
+  renderPlayers();
+  renderGifts();
+  renderHistory();
+
+  // update party inputs
+  document.getElementById("partyName").value = state.party.name || "";
+  document.getElementById("pAction").value = String(state.party.pAction ?? 0.2);
+}
+
+/* =========================
+   Events UI
+========================= */
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const key = btn.getAttribute("data-tab");
+    document.querySelectorAll(".tab").forEach(t=>t.style.display="none");
+    document.getElementById("tab-"+key).style.display="block";
+  });
+});
+
+document.getElementById("savePartyBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("partyName").value.trim() || "Nouvel An";
+  const pAction = Number(document.getElementById("pAction").value || 0.2);
+  state.party.name = name;
+  state.party.pAction = pAction;
+  // refresh seed if party name changed significantly (option: conserver)
+  state.party.seed = hashStrToSeed(name + "_" + String(state.party.seed));
+  logEvent("PARTY_UPDATE", null, { name, pAction });
+  saveState();
+  setResult(`<span class="ok">Partie enregistrée.</span>`);
+});
+
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  const ok = confirm("Réinitialiser ? Toutes les données de la partie seront perdues sur ce téléphone.");
+  if(!ok) return;
+  state = defaultState();
+  saveState();
+  setResult("Partie réinitialisée.");
+});
+
+document.getElementById("addPlayerBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("playerName").value.trim();
+  if(!name) return;
+  // éviter doublons
+  if(state.players.some(p=>p.name.toLowerCase()===name.toLowerCase())){
+    alert("Nom déjà présent.");
+    return;
+  }
+  const id = (Math.max(0, ...state.players.map(p=>p.id)) + 1) || 1;
+  const order = (Math.max(-1, ...state.players.map(p=>p.order)) + 1);
+  state.players.push({ id, name, order });
+  document.getElementById("playerName").value = "";
+  logEvent("PLAYER_ADD", id, { participantId:id, name });
+  saveState();
+});
+
+document.getElementById("addGiftsBtn").addEventListener("click", ()=>{
+  const text = document.getElementById("giftIds").value;
+  const ids = text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(ids.length===0) return;
+
+  const existing = new Set(state.gifts.map(g=>g.id));
+  let added = 0, dup = 0;
+  for(const id of ids){
+    if(existing.has(id)){ dup++; continue; }
+    state.gifts.push({ id, status:"IN_STOCK", ownerId:null, assignedAt:null, locked:false });
+    existing.add(id);
+    added++;
+  }
+  document.getElementById("giftIds").value = "";
+  logEvent("GIFTS_ADD", null, { added, duplicates:dup });
+  saveState();
+  setResult(`<span class="ok">${added} cadeau(x) ajouté(s) au stock.</span>${dup?` <span class="notice">${dup} doublon(s) ignoré(s).</span>`:""}`);
+});
+
+document.getElementById("addSampleGiftsBtn").addEventListener("click", ()=>{
+  const base = [];
+  for(let i=1;i<=10;i++){
+    base.push("GFT-" + String(i).padStart(3,"0"));
+  }
+  document.getElementById("giftIds").value = base.join("\n");
+});
+
+document.getElementById("drawBtn").addEventListener("click", async ()=>{
+  if(state.players.length===0){
+    setNotice("Ajoutez des participants.");
+    return;
+  }
+  if(state.gifts.length===0){
+    setNotice("Ajoutez des cadeaux (IDs) dans l’onglet Cadeaux.");
+    return;
+  }
+  await doDraw();
+});
+
+document.getElementById("shareBtn").addEventListener("click", async ()=>{
+  const lines = [];
+  lines.push(`Coffre de Minuit — ${state.party.name}`);
+  lines.push(`Actions: ${Math.round(Number(state.party.pAction||0.2)*100)}%`);
+  lines.push(`Stock: ${giftsInStock().length} / Attribués: ${giftsAssigned().length}`);
+  lines.push("");
+  lines.push("Historique (récent d'abord) :");
+  for(const ev of state.logs.slice(0,80)){
+    const actor = ev.actorId ? playerName(ev.actorId) : "";
+    lines.push(`[${fmtTime(ev.ts)}] ${ev.type}${actor?` (${actor})`:``} ${JSON.stringify(ev.payload)}`);
+  }
+  const text = lines.join("\n");
+
+  if(navigator.share){
+    try{
+      await navigator.share({ title:"Coffre de Minuit", text });
+      return;
+    }catch{}
+  }
+  // fallback: copier presse-papiers
+  try{
+    await navigator.clipboard.writeText(text);
+    alert("Historique copié dans le presse-papiers.");
+  }catch{
+    alert(text);
+  }
+});
+
+/* =========================
+   Service Worker
+========================= */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>
